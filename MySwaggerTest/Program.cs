@@ -19,6 +19,7 @@ namespace MySwaggerTest
         public static void Main(string[] args)
         {
             LogsFile.CreateLogFile();
+            DBConnect.ConnectDB(new DBConnect());
             WebApplication app = CreateApp(args);
             app.Run(); 
         }

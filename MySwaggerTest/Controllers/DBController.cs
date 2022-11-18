@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using MySwaggerTest.Models;
 using Npgsql;
+using System.ComponentModel.DataAnnotations;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -13,26 +14,27 @@ namespace MySwaggerTest.Controllers
     [ApiController]
     public class DBController : ControllerBase
     {
-        DBConnect dBConnect = new DBConnect(DBConnect.Hostname, DBConnect.Username, DBConnect.Password, DBConnect.DataBase);
-        NpgsqlConnection nc = new();
-
         // GET: DB api/<DBController>
-
         /// <summary>
         /// Этот метод выводит все данные подключенной БД PostGress.
         /// </summary>
         /// <returns>Вывод таблицы из БД</returns>
-        /// <response code="500">Проблема в подключении к БД</response>
+        /// <response code="401">Проблема в подключении к БД</response>
         /// <response code="200">Успех</response>
         [HttpGet]
-        [ProducesResponseType(500)]
+        [ProducesResponseType(401)]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<IEnumerable<DBDic>>> GetFromDB()
         {
-            nc = dBConnect.ConnectDB();
+            if(DBConnect.NC == null || DBConnect.NC!.State.ToString() != "Open") 
+            {
+                Response.StatusCode = 401;
+                return BadRequest("Не удалось подключиться к базе данных. Проверьте введённые данные. Статус подключения: {DBConnect.NC.FullState}");
+            }
             NpgsqlCommand npgcGetAll = new NpgsqlCommand(
                 "SELECT * FROM public.DicOfPost " +
-                "ORDER BY symbol ASC;", nc);
+                "ORDER BY symbol ASC;", DBConnect.NC);
 
             await using (var reader = await npgcGetAll.ExecuteReaderAsync())
             {
@@ -45,9 +47,9 @@ namespace MySwaggerTest.Controllers
                         int countOfIn = reader.GetInt32(1);
                         dicList.Add(new DBDic(symbol, countOfIn));
                     }
-                    return dicList;
+                    return Ok(dicList);
                 }
-                else return NotFound();
+                else return NotFound("База данных пуста, загрузите данные методом POST");
             } 
         }
 
@@ -56,22 +58,24 @@ namespace MySwaggerTest.Controllers
         /// Этот метод выводит количство вхождений буквы в подключенной таблице БД PostGress.
         /// </summary>
         /// <returns>Вывод количества вхождений символа</returns>
-        /// <param name="id">Char символ количство взхождений которого надо показать</param>
+        /// <param name="id">Char символ количество вхождений которого надо показать</param>
         /// <response code="500">Проблема в подключении к БД</response>
         /// <response code="200">Успех</response>
         /// <response code="404">Нет данных</response>
         [HttpGet("{id}")]
-        [ProducesResponseType(500)]
+        [ProducesResponseType(401)]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
 
         public ActionResult<string> Get(char id)
         {
-            try { nc = dBConnect.ConnectDB(); }
-            catch(Exception) { Response.StatusCode = 500; return BadRequest(); }
-            //nc = dBConnect.ConnectDB();
+            if (DBConnect.NC == null || DBConnect.NC!.State.ToString() != "Open")
+            {
+                Response.StatusCode = 401;
+                return BadRequest("Не удалось подключиться к базе данных. Проверьте введённые данные. Статус подключения: {DBConnect.NC.FullState}");
+            }
             NpgsqlCommand npgcGetId = new NpgsqlCommand(
-                "SELECT * FROM public.DicOfPost;", nc);
+                "SELECT * FROM public.DicOfPost;", DBConnect.NC);
             var reader = npgcGetId.ExecuteReader();
 
             if (reader.HasRows)//Если пришли результаты
@@ -81,11 +85,11 @@ namespace MySwaggerTest.Controllers
                     if (reader.GetChar(0) == id)
                     {
                         string respon = $"Count of \"{reader[0]}\" symbols in posts == {reader.GetInt32(1)}";
-                        return respon;
+                        return Ok(respon);
                     }    
                 }
             }
-            return NotFound();
+            return NotFound($"Вхождений символа {id} - не найдено в ДБ");
         }
 
         // POST: DB api/<DBController>
@@ -93,26 +97,42 @@ namespace MySwaggerTest.Controllers
         /// Этот метод опредлят настройки подключения к БД PostGress.
         /// </summary>
         /// <returns>Исход действия</returns>
-        /// <param name="hostname">Название Хоста БД</param>
-        /// <param name="username">Имя пользователя БД</param>
+        /// <response code="200">Успех</response>
+        /// <response code="400">Не введены данные /введены неврные данные</response>
+        /// <response code="401">Проблема в подключении к БД</response>
+        /// <param name="hostname">Имя хоста</param>
+        /// <param name="username">Имя пользователя</param>
         /// <param name="password">Пароль пользователя</param>
-        /// <param name="dataBase">Название БД</param>
+        /// <param name="database">Названи базы данных</param>
+        /// <remarks>
+        /// Sample request:
+        ///
+        ///     {
+        ///        "Hostname": "localhost",
+        ///        "Username": "postgres",
+        ///        "Password": "123",
+        ///        "DataBase": "postgres"
+        ///     }
+        ///
+        /// </remarks>
+
         [HttpPost]
-        public ActionResult<string> Post(string hostname = "localhost", string username = "Server", string password = "123", string dataBase = "VKPostDB")
+        [ProducesResponseType(401)]
+        [ProducesResponseType(400)]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public ActionResult<string> Post(string hostname, string username, string password, string database)
         {
-            try
+            DBConnect dB = new(hostname, username, password, database);  
+            try { DBConnect.ConnectDB(dB); }
+            catch {
+                Response.StatusCode = 401;
+                return BadRequest($"Не удалось подключиться к базе данных. Проверьте введённые данные. Статус подключения: {DBConnect.NC!.FullState}");
+            }   
+            if (DBConnect.NC!.State.ToString() == "Open")
             {
-                DBConnect.Hostname = hostname;
-                DBConnect.Username = username;
-                DBConnect.Password = password;
-                DBConnect.DataBase = dataBase;
-                DBConnect.ConnString = $"Host={hostname};Username={username};Password={password};Database={dataBase}";
-                return $"Success connection DB has set to {DBConnect.ConnString}";
+                return Ok($"Connection status : {DBConnect.NC.FullState}. With parametrs: {dB.ConnString}");
             }
-            catch (Exception)
-            {
-                return BadRequest();
-            }
+            return BadRequest($"Неизвстная ошибка статус подключения: {DBConnect.NC.FullState}");
         }
 
         // DELETE: DB api/<DBController>
@@ -123,12 +143,10 @@ namespace MySwaggerTest.Controllers
         [HttpDelete]
         public async Task<ActionResult<string>> DeleteTodoItem()
         {
-            nc = dBConnect.ConnectDB();
             NpgsqlCommand npgcGetAll = new NpgsqlCommand(
-                "DROP TABLE IF EXISTS DicOfPost;", nc);
-            var reader = await npgcGetAll.ExecuteReaderAsync();
+                "DROP TABLE IF EXISTS DicOfPost;", DBConnect.NC);
+            using var reader = await npgcGetAll.ExecuteReaderAsync();
             return "Succesfully deleted if exists before"; 
-            
         }
     }
 

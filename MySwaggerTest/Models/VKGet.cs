@@ -9,16 +9,16 @@ namespace MySwaggerTest.Models
     /// <see href="https://dev.vk.com/reference"/>
     public static class VKGet
     {
-
         /// <summary>
         /// Access_token и подробности его получения
         /// </summary>
         /// <see href="https://www.pandoge.com/socialnye-seti-i-messendzhery/poluchenie-klyucha-dostupa-access_token-dlya-api-vkontakte"/>
         [Required]
-        public static string access_token { get; set; } = "vk1.a.9X3O6CNcnFMfGbKkzFnFouyrSU5o0IJcP4gEveJLijATDUF1sLJTbYpu9hmFAi1TyneLVf1pJ1qQj1R2RQhIG_L4 - tU3I0pirPF2J6HcP_9OyLSAGZ7vWWZDNYDSz_Ll4ow8_gFKkOEwJ_uLI7qyb_YIMsBuSTy1vQwLMnUkgNokNCfRvEedpWbeW4BDZYLIO6HupwC_MADuZgXDrZpgeQ";
+        public static string? access_token { get; set; } 
         /// <summary>
         /// ID страницы в VK с которой будут браться посты
         /// </summary>
+        [Required]
         public static string owner_id { get; set; } = "-1";
         /// <summary>
         /// Количество постов взятых с страницы в ВК
@@ -40,6 +40,5 @@ namespace MySwaggerTest.Models
         /// Конечное обращение в ВК
         /// </summary>
         public static string QuaeryString { get; set; } = $"{path}" + "/" + Quaery;
-
     }
 }
