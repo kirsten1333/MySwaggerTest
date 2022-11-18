@@ -1,6 +1,4 @@
 ﻿using Npgsql;
-using System.ComponentModel;
-using System.ComponentModel.DataAnnotations;
 
 namespace MySwaggerTest.Models
 {
@@ -13,27 +11,31 @@ namespace MySwaggerTest.Models
         /// Имя хоста в PostgressSQL
         /// </summary>
         /// <value>String</value>
-        public static string Hostname { get; set; } = "localhost";
+        public string Hostname { get; private set; } = "localhost";
         /// <summary>
         /// Имя пользователя в PostgressSQL
         /// </summary>
         /// <value>String</value>
-        public static string Username { get; set; } = "postgres";
+        public string Username { get; private set; } = "postgres";
         /// <summary>
         /// Пароль пользователя в PostgressSQL
         /// </summary>
         /// <value>String</value>
-        public static string Password { get; set; } = "123";
+        public string Password { get; private set; } = "123";
         /// <summary>
         /// Имя базы данных в PostgressSQL
         /// </summary>
         /// <value>String</value>
-        public static string DataBase { get; set; } = "postgres";
+        public string DataBase { get; private set; } = "postgres";
         /// <summary>
         /// Готовая строка подключения в PostgressSQL
         /// </summary>
         /// <value>String</value>
-        public static string ConnString { get; set; } = $"Host={Hostname};Username={Username};Password={Password};Database={DataBase}";
+        public string ConnString { get; private set; } = $"Host=localhost;Username=postgres;Password=123;Database=postgres";
+        /// <summary>
+        /// Текущее подключение к ДБ
+        /// </summary>
+        public static NpgsqlConnection? NC{ get; private set; }
         /// <summary>
         /// Конструктор ДБ
         /// </summary>
@@ -46,14 +48,26 @@ namespace MySwaggerTest.Models
             ConnString = $"Host={Hostname};Username={Username};Password={Password};Database={DataBase}";
         }
         /// <summary>
+        /// Конструктор ДБ
+        /// </summary>
+        public DBConnect()
+        {
+            Hostname = "localhost";
+            Username = "postgres";
+            Password = "123";
+            DataBase = "postgres";
+            ConnString = $"Host={Hostname};Username={Username};Password={Password};Database={DataBase}";
+        }
+        /// <summary>
         /// Подключение к БД с заданными параметрами
         /// </summary>
         /// <returns></returns>
-        public NpgsqlConnection ConnectDB()
+        public static string ConnectDB(DBConnect dB)
         {
-            NpgsqlConnection nc = new(ConnString);
-            nc.Open();
-            return nc;
+            NC?.Close();
+            NC = new(dB.ConnString);
+            NC.Open();
+            return NC.State.ToString();
         }
     }
 }
